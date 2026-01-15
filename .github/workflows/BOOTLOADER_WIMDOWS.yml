@@ -1,0 +1,55 @@
+name: WINDOWS BOOTLOADER
+
+on:
+  workflow_dispatch: # Memungkinkan kamu menjalankan manual dari tab Actions
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install tools
+        run: sudo apt-get update && sudo apt-get install -y p7zip-full wget
+
+      - name: Download WinPE ISO
+        run: wget http://www.massam.jp/work/tools/winpe.iso
+
+      - name: Extract ISO
+        run: 7z x winpe.iso -oWINPE
+
+      - name: Replace boot.wim with empty file
+        run: |
+          # Cari semua file boot.wim di dalam folder WINPE
+          find WINPE -type f -name "boot.wim" -exec sh -c '
+            for file; do
+              echo "Replacing $file with empty file"
+              rm "$file"
+              touch "$file"
+            done
+          ' sh {} +
+
+      - name: Create 7z Archive
+        run: 7z a newfile.7z WINPE/
+
+      - name: Create Release Tag
+        id: create_tag
+        run: |
+          TAG_NAME="v$(date +'%Y%m%d%H%M%S')"
+          echo "tag_name=$TAG_NAME" >> $GITHUB_OUTPUT
+          git tag $TAG_NAME
+          git push origin $TAG_NAME
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload to Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: newfile.7z
+          tag_name: ${{ steps.create_tag.outputs.tag_name }}
+          name: Release ${{ steps.create_tag.outputs.tag_name }}
+          body: "Auto-repacked WinPE with empty boot.wim"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          
