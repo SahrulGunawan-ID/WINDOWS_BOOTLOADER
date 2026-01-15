@@ -11,10 +11,10 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Install tools
-        run: sudo apt-get update && sudo apt-get install -y p7zip-full wget
+        run: sudo apt-get update && sudo apt-get install -y p7zip-full wget curl
 
       - name: Download WinPE ISO
-        run: wget http://www.massam.jp/work/tools/winpe.iso
+        run: curl -o winpe.iso http://www.massam.jp/work/tools/winpe.iso
 
       - name: Extract ISO
         run: 7z x winpe.iso -oWINPE
