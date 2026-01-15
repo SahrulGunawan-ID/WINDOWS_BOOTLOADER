@@ -1,7 +1,10 @@
 name: WINDOWS BOOTLOADER
 
 on:
-  workflow_dispatch: # Memungkinkan kamu menjalankan manual dari tab Actions
+  workflow_dispatch:
+
+permissions:
+  contents: write
 
 jobs:
   build:
@@ -9,39 +12,41 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          ref: master
 
       - name: Install tools
-        run: sudo apt-get update && sudo apt-get install -y p7zip-full wget curl
+        run: sudo apt-get update && sudo apt-get install -y p7zip-full
 
       - name: Download WinPE ISO
-        run: curl -o winpe.iso http://www.massam.jp/work/tools/winpe.iso
+        run: |
+          curl -o winpe.iso http://www.massam.jp/work/tools/winpe.iso
+          echo "Download selesai."
 
       - name: Extract ISO
         run: 7z x winpe.iso -oWINPE
 
       - name: Replace boot.wim with empty file
         run: |
-          # Cari semua file boot.wim di dalam folder WINPE
-          find WINPE -type f -name "boot.wim" -exec sh -c '
-            for file; do
-              echo "Replacing $file with empty file"
-              rm "$file"
-              touch "$file"
-            done
-          ' sh {} +
+          find WINPE -type f -iname "boot.wim" -exec truncate -s 0 {} +
+          echo "Semua boot.wim telah dikosongkan."
 
       - name: Create 7z Archive
-        run: 7z a newfile.7z WINPE/
+        run: 7z a newfile.7z ./WINPE/*
 
-      - name: Create Release Tag
+      - name: Create Release Tag and Push
         id: create_tag
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           TAG_NAME="v$(date +'%Y%m%d%H%M%S')"
           echo "tag_name=$TAG_NAME" >> $GITHUB_OUTPUT
+          
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          
           git tag $TAG_NAME
-          git push origin $TAG_NAME
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          git push https://x-access-token:${GITHUB_TOKEN}@github.com/${{ github.repository }}.git master --tags
 
       - name: Upload to Release
         uses: softprops/action-gh-release@v2
@@ -49,7 +54,7 @@ jobs:
           files: newfile.7z
           tag_name: ${{ steps.create_tag.outputs.tag_name }}
           name: Release ${{ steps.create_tag.outputs.tag_name }}
-          body: "Auto-repacked WinPE with empty boot.wim"
+          body: "Repack WinPE: boot.wim dikosongkan. Menggunakan curl -o."
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           
